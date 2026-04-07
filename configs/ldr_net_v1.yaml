@@ -1,0 +1,51 @@
+model:
+  image_size: 1024
+  num_lesions: 22
+  num_diseases: 14
+  num_queries: 100
+  dim: 256
+  num_anatomy_tokens: 8
+  num_prototypes: 32
+  lesion_topk: 20
+  decoder_layers: 4
+  reasoner_layers: 3
+  nhead: 8
+
+data:
+  train_json: data/train.jsonl
+  val_json: data/val.jsonl
+  image_root: .
+  image_size: 1024
+  num_workers: 0
+  synthetic_train_samples: 16
+  synthetic_val_samples: 8
+  max_boxes_per_sample: 4
+
+training:
+  output_dir: outputs/ldr_net_v1
+  device: cpu
+  seed: 42
+  batch_size: 2
+  epochs: 1
+  log_every: 10
+  grad_clip_norm: 1.0
+  mixed_precision: false
+  max_steps: null
+
+optimizer:
+  lr_backbone: 1.0e-5
+  lr_main: 1.0e-4
+  weight_decay: 1.0e-4
+
+matcher:
+  class_cost: 2.0
+  bbox_cost: 5.0
+  giou_cost: 2.0
+
+loss:
+  no_object_weight: 0.1
+  bbox_weight: 5.0
+  giou_weight: 2.0
+  disease_weight: 1.0
+  detection_weight: 1.0
+  uncertainty_weight: 0.05
