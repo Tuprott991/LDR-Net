@@ -1,0 +1,51 @@
+model:
+  image_size: 128
+  num_lesions: 4
+  num_diseases: 3
+  num_queries: 12
+  dim: 64
+  num_anatomy_tokens: 4
+  num_prototypes: 8
+  lesion_topk: 5
+  decoder_layers: 2
+  reasoner_layers: 2
+  nhead: 4
+
+data:
+  train_json: data/train.jsonl
+  val_json: data/val.jsonl
+  image_root: .
+  image_size: 128
+  num_workers: 0
+  synthetic_train_samples: 8
+  synthetic_val_samples: 4
+  max_boxes_per_sample: 3
+
+training:
+  output_dir: outputs/ldr_net_smoke
+  device: cpu
+  seed: 7
+  batch_size: 2
+  epochs: 1
+  log_every: 1
+  grad_clip_norm: 1.0
+  mixed_precision: false
+  max_steps: 1
+
+optimizer:
+  lr_backbone: 1.0e-5
+  lr_main: 1.0e-4
+  weight_decay: 1.0e-4
+
+matcher:
+  class_cost: 2.0
+  bbox_cost: 5.0
+  giou_cost: 2.0
+
+loss:
+  no_object_weight: 0.1
+  bbox_weight: 5.0
+  giou_weight: 2.0
+  disease_weight: 1.0
+  detection_weight: 1.0
+  uncertainty_weight: 0.05

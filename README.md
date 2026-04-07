@@ -69,7 +69,7 @@ python scripts/train.py --config configs/ldr_net_v1.yaml
 For a CPU smoke test with synthetic data:
 
 ```bash
-python scripts/train.py --config configs/ldr_net_v1.yaml --synthetic --max-steps 2
+python scripts/train.py --config configs/ldr_net_smoke.yaml --synthetic
 ```
 
 ## Notes
