@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from torch import Tensor, nn
 
-from .backbone import ResNetBackbone
+from .backbone import HFConvNeXtV2Backbone, build_backbone
 from .fpn import FeaturePyramidNetwork
 from .heads import (
     AnatomyBranch,
@@ -30,6 +30,10 @@ class LesionDiseaseNet(nn.Module):
         self,
         in_channels: int = 1,
         image_size: int = 1024,
+        backbone_type: str = "hf_convnextv2",
+        backbone_name: str = HFConvNeXtV2Backbone.DEFAULT_MODEL_NAME,
+        backbone_local_files_only: bool = False,
+        backbone_fallback_to_resnet: bool = True,
         num_lesions: int = 22,
         num_diseases: int = 14,
         num_queries: int = 100,
@@ -44,7 +48,13 @@ class LesionDiseaseNet(nn.Module):
     ) -> None:
         super().__init__()
         self.image_size = image_size
-        self.backbone = ResNetBackbone(in_channels=in_channels)
+        self.backbone = build_backbone(
+            backbone_type=backbone_type,
+            backbone_name=backbone_name,
+            in_channels=in_channels,
+            local_files_only=backbone_local_files_only,
+            fallback_to_resnet=backbone_fallback_to_resnet,
+        )
         self.fpn = FeaturePyramidNetwork(self.backbone.out_channels, out_channels=dim)
         self.projector = MultiScaleProjector(dim, out_channels=dim, levels=4)
         self.lesion_decoder = LesionDecoder(

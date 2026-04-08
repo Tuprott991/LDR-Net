@@ -1,0 +1,2 @@
+{"image_path": "train/img_a.png", "sample_id": "img_a", "boxes": [[0.15625, 0.3125, 0.2604166666666667, 0.5208333333333334]], "labels": [0], "disease_labels": [0, 0, 0, 0, 0, 0], "lesion_concept_labels": [1], "has_detection": true, "has_disease_labels": true, "num_skipped_boxes": 0}
+{"image_path": "train/img_b.png", "sample_id": "img_b", "boxes": [], "labels": [], "disease_labels": [0, 0, 0, 0, 0, 1], "lesion_concept_labels": [0], "has_detection": true, "has_disease_labels": true, "num_skipped_boxes": 0}

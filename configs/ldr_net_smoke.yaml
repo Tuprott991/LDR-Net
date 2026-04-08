@@ -1,5 +1,7 @@
 model:
   image_size: 128
+  backbone_type: resnet18
+  backbone_fallback_to_resnet: true
   num_lesions: 4
   num_diseases: 3
   num_queries: 12

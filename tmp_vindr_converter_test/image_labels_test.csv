@@ -1,0 +1,3 @@
+image_id,rad_id,Atelectasis,COPD,Lung tumor,Pneumonia,Tuberculosis,Other diseases,No finding
+img_a,R1,1,0,0,0,0,0,0
+img_b,R1,0,0,0,0,0,0,1

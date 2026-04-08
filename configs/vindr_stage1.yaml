@@ -4,8 +4,8 @@ model:
   backbone_name: shreydan/CheXpert-5-convnextv2-tiny-384
   backbone_local_files_only: false
   backbone_fallback_to_resnet: true
-  num_lesions: 22
-  num_diseases: 14
+  num_lesions: 40
+  num_diseases: 6
   num_queries: 100
   dim: 256
   num_anatomy_tokens: 8
@@ -16,22 +16,22 @@ model:
   nhead: 8
 
 data:
-  train_json: data/train.jsonl
-  val_json: data/val.jsonl
-  image_root: .
+  train_json: data/vindr_physionet_384/train.jsonl
+  val_json: data/vindr_physionet_384/test.jsonl
+  image_root: vindr_physionet_384
   image_size: 384
-  num_workers: 0
+  num_workers: 2
   synthetic_train_samples: 16
   synthetic_val_samples: 8
   max_boxes_per_sample: 4
 
 training:
-  output_dir: outputs/ldr_net_v1
+  output_dir: outputs/vindr_stage1
   device: cuda
   seed: 42
-  batch_size: 2
-  epochs: 1
-  log_every: 10
+  batch_size: 4
+  epochs: 20
+  log_every: 20
   grad_clip_norm: 1.0
   mixed_precision: false
   max_steps: null
@@ -50,6 +50,6 @@ loss:
   no_object_weight: 0.1
   bbox_weight: 5.0
   giou_weight: 2.0
-  disease_weight: 1.0
+  disease_weight: 0.5
   detection_weight: 1.0
   uncertainty_weight: 0.05
