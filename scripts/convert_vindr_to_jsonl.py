@@ -24,6 +24,10 @@ def parse_args():
     parser.add_argument("--positive-vote-threshold", type=int, default=1, help="Minimum radiologist votes required for a positive label")
     parser.add_argument("--train-dir", type=str, default="train", help="Relative train image dir under source root")
     parser.add_argument("--test-dir", type=str, default="test", help="Relative test image dir under source root")
+    parser.add_argument("--annotation-train-csv", type=str, default=None, help="Optional train annotation CSV path relative to source root")
+    parser.add_argument("--annotation-test-csv", type=str, default=None, help="Optional test annotation CSV path relative to source root")
+    parser.add_argument("--label-train-csv", type=str, default=None, help="Optional train image-level label CSV path relative to source root")
+    parser.add_argument("--label-test-csv", type=str, default=None, help="Optional test image-level label CSV path relative to source root")
     return parser.parse_args()
 
 
@@ -47,6 +51,13 @@ def read_label_rows(csv_path: Path):
         columns = reader.fieldnames or []
         rows = list(reader)
     return columns, rows
+
+
+def empty_label_info():
+    return {
+        "disease_labels": None,
+        "lesion_concept_labels": None,
+    }
 
 
 def aggregate_image_labels(rows, disease_columns, positive_vote_threshold):
@@ -149,25 +160,39 @@ def make_record(image_id, split_dir, image_ext, image_root, label_info, annotati
         "disease_labels": label_info["disease_labels"],
         "lesion_concept_labels": label_info["lesion_concept_labels"],
         "has_detection": True,
-        "has_disease_labels": True,
+        "has_disease_labels": label_info["disease_labels"] is not None,
         "num_skipped_boxes": out_of_bounds,
     }
 
 
-def convert_split(source_root: Path, split_name: str, image_dir_name: str, output_dir: Path, disease_columns, positive_vote_threshold, image_ext, class_to_index):
-    label_csv = source_root / f"image_labels_{split_name}.csv"
-    annotation_csv = source_root / f"annotations_{split_name}.csv"
-
-    _, label_rows = read_label_rows(label_csv)
-    aggregated_labels, lesion_concept_columns = aggregate_image_labels(
-        label_rows,
-        disease_columns=disease_columns,
-        positive_vote_threshold=positive_vote_threshold,
-    )
+def convert_split(
+    source_root: Path,
+    split_name: str,
+    image_dir_name: str,
+    output_dir: Path,
+    disease_columns,
+    positive_vote_threshold,
+    image_ext,
+    class_to_index,
+    annotation_csv: Path,
+    label_csv: Path | None,
+):
+    if label_csv is not None and label_csv.exists():
+        _, label_rows = read_label_rows(label_csv)
+        aggregated_labels, lesion_concept_columns = aggregate_image_labels(
+            label_rows,
+            disease_columns=disease_columns,
+            positive_vote_threshold=positive_vote_threshold,
+        )
+    else:
+        aggregated_labels = defaultdict(empty_label_info)
+        lesion_concept_columns = []
     annotations = read_annotations(annotation_csv, class_to_index=class_to_index)
+    image_ids = sorted(set(aggregated_labels.keys()) | set(annotations.keys()))
 
     records = []
-    for image_id, label_info in aggregated_labels.items():
+    for image_id in image_ids:
+        label_info = aggregated_labels[image_id]
         records.append(
             make_record(
                 image_id=image_id,
@@ -192,11 +217,15 @@ def main():
     args = parse_args()
     source_root = Path(args.source_root)
     output_dir = Path(args.output_dir)
+    train_annotation_csv = source_root / (args.annotation_train_csv or "annotations_train.csv")
+    test_annotation_csv = source_root / (args.annotation_test_csv or "annotations_test.csv")
+    train_label_csv = source_root / args.label_train_csv if args.label_train_csv else source_root / "image_labels_train.csv"
+    test_label_csv = source_root / args.label_test_csv if args.label_test_csv else source_root / "image_labels_test.csv"
 
     box_class_names = collect_box_class_names(
         [
-            source_root / "annotations_train.csv",
-            source_root / "annotations_test.csv",
+            train_annotation_csv,
+            test_annotation_csv,
         ]
     )
     class_to_index = {name: index for index, name in enumerate(box_class_names)}
@@ -210,6 +239,8 @@ def main():
         positive_vote_threshold=args.positive_vote_threshold,
         image_ext=args.image_ext,
         class_to_index=class_to_index,
+        annotation_csv=train_annotation_csv,
+        label_csv=train_label_csv if train_label_csv.exists() else None,
     )
     test_jsonl, _, test_count = convert_split(
         source_root=source_root,
@@ -220,6 +251,8 @@ def main():
         positive_vote_threshold=args.positive_vote_threshold,
         image_ext=args.image_ext,
         class_to_index=class_to_index,
+        annotation_csv=test_annotation_csv,
+        label_csv=test_label_csv if test_label_csv.exists() else None,
     )
 
     metadata = {
@@ -230,7 +263,7 @@ def main():
         "positive_vote_threshold": args.positive_vote_threshold,
         "box_classes": box_class_names,
         "lesion_concept_classes": lesion_concept_columns,
-        "disease_classes": DEFAULT_DISEASE_COLUMNS,
+        "disease_classes": DEFAULT_DISEASE_COLUMNS if train_label_csv.exists() or test_label_csv.exists() else [],
         "train_samples": train_count,
         "test_samples": test_count,
     }

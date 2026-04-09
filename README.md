@@ -88,7 +88,7 @@ This writes:
 - `data/vindr_physionet_384/test.jsonl`
 - `data/vindr_physionet_384/metadata.json`
 
-The converter treats `COPD`, `Lung tumor`, `Pneumonia`, `Tuberculosis`, `Other diseases`, and `No finding` as diseases. The remaining image-level label columns are stored as lesion concepts. Bounding-box classes come from the unique `class_name` values in the annotation CSVs.
+The converter treats `COPD`, `Lung tumor`, `Pneumonia`, `Tuberculosis`, `Other diseases`, and `No finding` as diseases. The remaining image-level label columns are stored as lesion concepts. Bounding-box classes come from the unique boxed `class_name` values in the annotation CSVs, and `No finding` rows with empty coordinates are kept as negative samples rather than box classes.
 
 ## Training
 
