@@ -15,6 +15,7 @@ from ldr_net.losses import HungarianMatcher, LesionDiseaseCriterion
 from ldr_net.models import LesionDiseaseNet
 from ldr_net.utils.checkpoint import save_checkpoint
 from ldr_net.utils.config import load_config
+from ldr_net.utils.data_audit import format_summary, summarize_jsonl_samples
 from ldr_net.utils.train import build_optimizer, seed_everything
 
 
@@ -58,6 +59,44 @@ def build_datasets(cfg, synthetic=False):
     return train_dataset, val_dataset
 
 
+def audit_and_validate_datasets(cfg, train_dataset, val_dataset):
+    if not hasattr(train_dataset, "samples"):
+        return
+
+    train_summary = summarize_jsonl_samples(train_dataset.samples)
+    print(format_summary("train_data", train_summary))
+
+    if hasattr(val_dataset, "samples"):
+        val_summary = summarize_jsonl_samples(val_dataset.samples)
+        print(format_summary("val_data", val_summary))
+    else:
+        val_summary = None
+
+    configured_num_lesions = cfg["model"]["num_lesions"]
+    if train_summary["contiguous_labels"] and train_summary["max_label"] is not None:
+        inferred_num_lesions = train_summary["max_label"] + 1
+        if inferred_num_lesions != configured_num_lesions:
+            print(
+                "[warning] Contiguous lesion labels were detected in the training JSONL, "
+                f"which suggests num_lesions should be {inferred_num_lesions}, "
+                f"but the config uses {configured_num_lesions}."
+            )
+
+    if train_summary["disease_supervised_samples"] == 0 and cfg["loss"]["disease_weight"] != 0.0:
+        print(
+            "[warning] No disease supervision was found in the training JSONL. "
+            "Setting disease_weight to 0.0 for this run."
+        )
+        cfg["loss"]["disease_weight"] = 0.0
+
+    if train_summary["images_with_conflicting_duplicate_boxes"] > 0:
+        print(
+            "[warning] The training JSONL contains exact duplicate boxes with conflicting labels "
+            f"in {train_summary['images_with_conflicting_duplicate_boxes']} images. "
+            "This usually means per-radiologist boxes were preserved without consolidation."
+        )
+
+
 def main():
     args = parse_args()
     cfg = load_config(args.config)
@@ -66,6 +105,9 @@ def main():
 
     device = torch.device(cfg["training"]["device"])
     seed_everything(cfg["training"]["seed"])
+
+    train_dataset, val_dataset = build_datasets(cfg, synthetic=args.synthetic)
+    audit_and_validate_datasets(cfg, train_dataset, val_dataset)
 
     model = LesionDiseaseNet(**cfg["model"]).to(device)
     matcher = HungarianMatcher(**cfg["matcher"])
@@ -76,7 +118,6 @@ def main():
     ).to(device)
     optimizer = build_optimizer(model, cfg["optimizer"])
 
-    train_dataset, val_dataset = build_datasets(cfg, synthetic=args.synthetic)
     train_loader = DataLoader(
         train_dataset,
         batch_size=cfg["training"]["batch_size"],

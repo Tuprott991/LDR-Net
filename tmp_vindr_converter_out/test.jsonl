@@ -1,2 +1,0 @@
-{"image_path": "test/img_a.png", "sample_id": "img_a", "boxes": [[0.14973958333333334, 0.29296875, 0.22135416666666666, 0.4557291666666667]], "labels": [0], "disease_labels": [0, 0, 0, 0, 0, 0], "lesion_concept_labels": [1], "has_detection": true, "has_disease_labels": true, "num_skipped_boxes": 0}
-{"image_path": "test/img_b.png", "sample_id": "img_b", "boxes": [], "labels": [], "disease_labels": [0, 0, 0, 0, 0, 1], "lesion_concept_labels": [0], "has_detection": true, "has_disease_labels": true, "num_skipped_boxes": 0}

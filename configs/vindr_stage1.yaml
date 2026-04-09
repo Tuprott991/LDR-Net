@@ -50,6 +50,6 @@ loss:
   no_object_weight: 0.1
   bbox_weight: 5.0
   giou_weight: 2.0
-  disease_weight: 0.5
+  disease_weight: 0.0
   detection_weight: 1.0
   uncertainty_weight: 0.05

@@ -1,3 +1,0 @@
-image_id,rad_ID,class_name,x_min,y_min,x_max,y_max,class_id
-img_a,R1,Atelectasis,10,20,110,220,0
-img_b,R1,No finding,,,,,7

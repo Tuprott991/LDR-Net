@@ -42,6 +42,9 @@ def train_one_epoch(
     model.train()
     criterion.train()
     totals = defaultdict(float)
+    disease_weight = 1.0
+    if hasattr(criterion, "loss_cfg"):
+        disease_weight = float(criterion.loss_cfg.get("disease_weight", 1.0))
 
     for step, (images, targets) in enumerate(dataloader):
         if max_steps is not None and step >= max_steps:
@@ -64,11 +67,14 @@ def train_one_epoch(
             totals[key] += float(value.detach().item())
 
         if step % log_every == 0:
-            print(
+            message = (
                 f"epoch={epoch} step={step} "
                 f"loss={loss_dict['loss_total'].detach().item():.4f} "
-                f"disease={loss_dict['loss_disease'].detach().item():.4f}"
+                f"detection={loss_dict['loss_detection'].detach().item():.4f}"
             )
+            if disease_weight != 0.0:
+                message += f" disease={loss_dict['loss_disease'].detach().item():.4f}"
+            print(message)
 
     return _mean_metrics(totals, max(1, min(len(dataloader), (max_steps or len(dataloader)))))
 
