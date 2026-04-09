@@ -18,7 +18,7 @@ model:
 data:
   train_json: data/vindr_physionet_384/train.jsonl
   val_json: data/vindr_physionet_384/test.jsonl
-  image_root: vindr_physionet_384
+  image_root: /kaggle/input/datasets/tuktuai/vindr-physionet-384-with-annotations
   image_size: 384
   num_workers: 2
   synthetic_train_samples: 16
