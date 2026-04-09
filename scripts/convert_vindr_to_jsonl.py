@@ -60,6 +60,13 @@ def empty_label_info():
     }
 
 
+def list_image_ids(image_dir: Path, image_ext: str):
+    image_ids = []
+    for path in sorted(image_dir.glob(f"*{image_ext}")):
+        image_ids.append(path.stem)
+    return image_ids
+
+
 def aggregate_image_labels(rows, disease_columns, positive_vote_threshold):
     grouped = defaultdict(list)
     for row in rows:
@@ -177,6 +184,7 @@ def convert_split(
     annotation_csv: Path,
     label_csv: Path | None,
 ):
+    image_dir = source_root / image_dir_name
     if label_csv is not None and label_csv.exists():
         _, label_rows = read_label_rows(label_csv)
         aggregated_labels, lesion_concept_columns = aggregate_image_labels(
@@ -184,11 +192,13 @@ def convert_split(
             disease_columns=disease_columns,
             positive_vote_threshold=positive_vote_threshold,
         )
+        image_ids = sorted(set(aggregated_labels.keys()))
     else:
         aggregated_labels = defaultdict(empty_label_info)
         lesion_concept_columns = []
+        image_ids = list_image_ids(image_dir=image_dir, image_ext=image_ext)
     annotations = read_annotations(annotation_csv, class_to_index=class_to_index)
-    image_ids = sorted(set(aggregated_labels.keys()) | set(annotations.keys()))
+    image_ids = sorted(set(image_ids) | set(annotations.keys()))
 
     records = []
     for image_id in image_ids:
