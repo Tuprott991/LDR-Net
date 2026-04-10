@@ -39,9 +39,10 @@ training:
   max_steps: null
 
 optimizer:
-  lr_backbone: 1.0e-5
-  lr_main: 1.0e-4
+  lr_backbone: 5.0e-6
+  lr_main: 5.0e-5
   weight_decay: 1.0e-4
+  freeze_backbone_epochs: 4
 
 matcher:
   class_cost: 2.0

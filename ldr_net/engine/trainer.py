@@ -40,6 +40,8 @@ def train_one_epoch(
 ) -> Dict[str, float]:
     del mixed_precision
     model.train()
+    if getattr(model, "_freeze_backbone_active", False):
+        model.backbone.eval()
     criterion.train()
     totals = defaultdict(float)
     disease_weight = 1.0

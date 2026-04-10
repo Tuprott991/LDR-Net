@@ -16,7 +16,7 @@ from ldr_net.models import LesionDiseaseNet
 from ldr_net.utils.checkpoint import save_checkpoint
 from ldr_net.utils.config import load_config
 from ldr_net.utils.data_audit import format_summary, summarize_jsonl_samples
-from ldr_net.utils.train import build_optimizer, seed_everything
+from ldr_net.utils.train import build_optimizer, configure_optimizer_for_epoch, seed_everything
 
 
 def parse_args():
@@ -179,6 +179,19 @@ def main():
 
     best_val = float("inf")
     for epoch in range(cfg["training"]["epochs"]):
+        optimizer_state = configure_optimizer_for_epoch(
+            model=model,
+            optimizer=optimizer,
+            optimizer_cfg=cfg["optimizer"],
+            epoch=epoch,
+        )
+        print(
+            f"epoch={epoch} setup "
+            f"backbone_frozen={optimizer_state['backbone_frozen']} "
+            f"lr_backbone={optimizer_state['lr_backbone']:.2e} "
+            f"lr_main={optimizer_state['lr_main']:.2e}"
+        )
+
         train_metrics = train_one_epoch(
             model=model,
             criterion=criterion,
