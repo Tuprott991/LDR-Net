@@ -144,6 +144,8 @@ def main():
 
     device = torch.device(cfg["training"]["device"])
     seed_everything(cfg["training"]["seed"])
+    if device.type == "cuda":
+        torch.backends.cudnn.benchmark = True
 
     train_dataset, val_dataset = build_datasets(cfg, synthetic=args.synthetic)
     train_summary = audit_and_validate_datasets(cfg, train_dataset, val_dataset)
@@ -164,6 +166,8 @@ def main():
         shuffle=train_sampler is None,
         sampler=train_sampler,
         num_workers=cfg["data"]["num_workers"],
+        pin_memory=device.type == "cuda",
+        persistent_workers=cfg["data"]["num_workers"] > 0,
         collate_fn=cxr_collate_fn,
     )
     val_loader = DataLoader(
@@ -171,6 +175,8 @@ def main():
         batch_size=cfg["training"]["batch_size"],
         shuffle=False,
         num_workers=cfg["data"]["num_workers"],
+        pin_memory=device.type == "cuda",
+        persistent_workers=cfg["data"]["num_workers"] > 0,
         collate_fn=cxr_collate_fn,
     )
 
@@ -178,6 +184,15 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     best_val = float("inf")
+    mixed_precision = bool(cfg["training"].get("mixed_precision", False))
+    if device.type == "cuda":
+        try:
+            scaler = torch.amp.GradScaler("cuda", enabled=mixed_precision)
+        except AttributeError:  # pragma: no cover - older torch fallback
+            scaler = torch.cuda.amp.GradScaler(enabled=mixed_precision)
+    else:
+        scaler = None
+
     for epoch in range(cfg["training"]["epochs"]):
         optimizer_state = configure_optimizer_for_epoch(
             model=model,
@@ -202,7 +217,9 @@ def main():
             log_every=cfg["training"]["log_every"],
             max_steps=cfg["training"]["max_steps"],
             grad_clip_norm=cfg["training"]["grad_clip_norm"],
-            mixed_precision=cfg["training"]["mixed_precision"],
+            mixed_precision=mixed_precision,
+            scaler=scaler,
+            accumulation_steps=cfg["training"].get("accumulation_steps", 1),
         )
         val_metrics = evaluate(
             model=model,
@@ -210,6 +227,7 @@ def main():
             dataloader=val_loader,
             device=device,
             max_steps=cfg["training"]["max_steps"],
+            mixed_precision=mixed_precision,
         )
 
         checkpoint = {
