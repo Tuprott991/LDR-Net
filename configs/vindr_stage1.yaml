@@ -42,7 +42,7 @@ optimizer:
   lr_backbone: 5.0e-7
   lr_main: 3.0e-6
   weight_decay: 1.0e-4
-  freeze_backbone_epochs: 4
+  freeze_backbone_epochs: 5
 
 matcher:
   class_cost: 2.0
