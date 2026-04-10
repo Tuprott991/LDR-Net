@@ -32,7 +32,7 @@ training:
   device: cuda
   seed: 42
   batch_size: 12
-  epochs: 20
+  epochs: 8
   log_every: 20
   grad_clip_norm: 1.0
   mixed_precision: false
