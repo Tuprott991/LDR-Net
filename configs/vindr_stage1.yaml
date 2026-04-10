@@ -21,6 +21,8 @@ data:
   image_root: /kaggle/input/datasets/tuktuai/vindr-physionet-384-with-annotations
   image_size: 384
   num_workers: 2
+  deduplicate_boxes: true
+  weighted_sampler: auto
   synthetic_train_samples: 16
   synthetic_val_samples: 8
   max_boxes_per_sample: 4

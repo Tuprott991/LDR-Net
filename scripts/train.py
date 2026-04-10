@@ -7,7 +7,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 
 from ldr_net.data import CXRDetectionDiseaseDataset, SyntheticCXRDataset, cxr_collate_fn
 from ldr_net.engine import evaluate, train_one_epoch
@@ -50,18 +50,20 @@ def build_datasets(cfg, synthetic=False):
         annotations_path=data_cfg["train_json"],
         image_root=data_cfg["image_root"],
         image_size=data_cfg["image_size"],
+        deduplicate_boxes=data_cfg.get("deduplicate_boxes", True),
     )
     val_dataset = CXRDetectionDiseaseDataset(
         annotations_path=data_cfg["val_json"],
         image_root=data_cfg["image_root"],
         image_size=data_cfg["image_size"],
+        deduplicate_boxes=data_cfg.get("deduplicate_boxes", True),
     )
     return train_dataset, val_dataset
 
 
 def audit_and_validate_datasets(cfg, train_dataset, val_dataset):
     if not hasattr(train_dataset, "samples"):
-        return
+        return None
 
     train_summary = summarize_jsonl_samples(train_dataset.samples)
     print(format_summary("train_data", train_summary))
@@ -77,10 +79,10 @@ def audit_and_validate_datasets(cfg, train_dataset, val_dataset):
         inferred_num_lesions = train_summary["max_label"] + 1
         if inferred_num_lesions != configured_num_lesions:
             print(
-                "[warning] Contiguous lesion labels were detected in the training JSONL, "
-                f"which suggests num_lesions should be {inferred_num_lesions}, "
-                f"but the config uses {configured_num_lesions}."
+                "[warning] Contiguous lesion labels were detected in the training JSONL. "
+                f"Overriding num_lesions from {configured_num_lesions} to {inferred_num_lesions}."
             )
+            cfg["model"]["num_lesions"] = inferred_num_lesions
 
     if train_summary["disease_supervised_samples"] == 0 and cfg["loss"]["disease_weight"] != 0.0:
         print(
@@ -93,8 +95,45 @@ def audit_and_validate_datasets(cfg, train_dataset, val_dataset):
         print(
             "[warning] The training JSONL contains exact duplicate boxes with conflicting labels "
             f"in {train_summary['images_with_conflicting_duplicate_boxes']} images. "
-            "This usually means per-radiologist boxes were preserved without consolidation."
+            "This usually means per-radiologist boxes were preserved without consolidation. "
+            "The dataset loader will now deduplicate exact duplicate boxes per image."
         )
+
+    return train_summary
+
+
+def build_train_sampler(cfg, train_dataset, train_summary):
+    if train_summary is None or not hasattr(train_dataset, "samples"):
+        return None
+
+    sampler_mode = cfg["data"].get("weighted_sampler", "auto")
+    if sampler_mode is False:
+        return None
+
+    positive_count = train_summary["positive_box_samples"]
+    negative_count = train_summary["empty_box_samples"]
+    if positive_count == 0 or negative_count == 0:
+        return None
+
+    if sampler_mode == "auto" and positive_count >= negative_count:
+        return None
+
+    pos_weight = 0.5 / positive_count
+    neg_weight = 0.5 / negative_count
+    weights = []
+    for sample in train_dataset.samples:
+        boxes = sample.get("boxes") or []
+        weights.append(pos_weight if len(boxes) > 0 else neg_weight)
+
+    print(
+        "[info] Using weighted sampling to balance positive and empty-box images "
+        f"(positives={positive_count}, negatives={negative_count})."
+    )
+    return WeightedRandomSampler(
+        weights=weights,
+        num_samples=len(weights),
+        replacement=True,
+    )
 
 
 def main():
@@ -107,7 +146,8 @@ def main():
     seed_everything(cfg["training"]["seed"])
 
     train_dataset, val_dataset = build_datasets(cfg, synthetic=args.synthetic)
-    audit_and_validate_datasets(cfg, train_dataset, val_dataset)
+    train_summary = audit_and_validate_datasets(cfg, train_dataset, val_dataset)
+    train_sampler = build_train_sampler(cfg, train_dataset, train_summary)
 
     model = LesionDiseaseNet(**cfg["model"]).to(device)
     matcher = HungarianMatcher(**cfg["matcher"])
@@ -121,7 +161,8 @@ def main():
     train_loader = DataLoader(
         train_dataset,
         batch_size=cfg["training"]["batch_size"],
-        shuffle=True,
+        shuffle=train_sampler is None,
+        sampler=train_sampler,
         num_workers=cfg["data"]["num_workers"],
         collate_fn=cxr_collate_fn,
     )

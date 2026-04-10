@@ -59,6 +59,8 @@ class HFConvNeXtV2Backbone(nn.Module):
     """ConvNeXtV2 backbone loaded from a Hugging Face checkpoint."""
 
     DEFAULT_MODEL_NAME = "shreydan/CheXpert-5-convnextv2-tiny-384"
+    DEFAULT_HIDDEN_SIZES = [96, 192, 384, 768]
+    DEFAULT_DEPTHS = [3, 3, 9, 3]
 
     def __init__(
         self,
@@ -94,16 +96,36 @@ class HFConvNeXtV2Backbone(nn.Module):
             if in_channels not in (1, 3):
                 self.channel_adapter = nn.Conv2d(in_channels, 3, kernel_size=1, bias=False)
         except Exception as exc:
-            if not fallback_to_resnet:
-                raise
-            warnings.warn(
-                f"Falling back to torchvision ResNet backbone because '{model_name}' could not be loaded: {exc}",
-                stacklevel=2,
-            )
-            self.fallback = ResNetBackbone(in_channels=in_channels)
-            self.backbone = None
-            self._out_channels = self.fallback.out_channels
-            self.channel_adapter = None
+            try:
+                from transformers import ConvNextV2Config, ConvNextV2Model
+
+                warnings.warn(
+                    f"Loading ConvNeXtV2 architecture without pretrained download because '{model_name}' "
+                    f"could not be fetched: {exc}",
+                    stacklevel=2,
+                )
+                config = ConvNextV2Config(
+                    image_size=384,
+                    num_channels=3,
+                    hidden_sizes=self.DEFAULT_HIDDEN_SIZES,
+                    depths=self.DEFAULT_DEPTHS,
+                )
+                self.backbone = ConvNextV2Model(config)
+                self._out_channels = list(config.hidden_sizes)
+                self.channel_adapter = None
+                if in_channels not in (1, 3):
+                    self.channel_adapter = nn.Conv2d(in_channels, 3, kernel_size=1, bias=False)
+            except Exception:
+                if not fallback_to_resnet:
+                    raise
+                warnings.warn(
+                    f"Falling back to torchvision ResNet backbone because '{model_name}' could not be loaded: {exc}",
+                    stacklevel=2,
+                )
+                self.fallback = ResNetBackbone(in_channels=in_channels)
+                self.backbone = None
+                self._out_channels = self.fallback.out_channels
+                self.channel_adapter = None
 
     @property
     def out_channels(self) -> List[int]:

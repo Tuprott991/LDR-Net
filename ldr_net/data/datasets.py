@@ -108,6 +108,44 @@ def _as_mask_tensor(masks: Any) -> torch.Tensor:
     return tensor.float()
 
 
+def _deduplicate_boxes_and_labels(
+    boxes: torch.Tensor,
+    labels: torch.Tensor,
+    precision: int = 6,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if boxes.numel() == 0 or labels.numel() == 0:
+        return boxes, labels
+
+    grouped: dict[tuple[float, float, float, float], list[int]] = {}
+    order: list[tuple[float, float, float, float]] = []
+
+    for box, label in zip(boxes.tolist(), labels.tolist()):
+        key = tuple(round(float(value), precision) for value in box)
+        if key not in grouped:
+            grouped[key] = []
+            order.append(key)
+        grouped[key].append(int(label))
+
+    if len(order) == len(boxes):
+        return boxes, labels
+
+    dedup_boxes = []
+    dedup_labels = []
+    for key in order:
+        votes = grouped[key]
+        label_counts: dict[int, int] = {}
+        for label in votes:
+            label_counts[label] = label_counts.get(label, 0) + 1
+        chosen_label = sorted(label_counts.items(), key=lambda item: (-item[1], item[0]))[0][0]
+        dedup_boxes.append(list(key))
+        dedup_labels.append(chosen_label)
+
+    return (
+        boxes.new_tensor(dedup_boxes, dtype=torch.float32),
+        labels.new_tensor(dedup_labels, dtype=torch.long),
+    )
+
+
 class LDRNetDataset(Dataset):
     """Generic dataset wrapper for LDR-Net training."""
 
@@ -118,6 +156,7 @@ class LDRNetDataset(Dataset):
         target_key: Optional[str] = None,
         image_root: Optional[str | Path] = None,
         image_size: Optional[int] = None,
+        deduplicate_boxes: bool = True,
         transforms: Optional[Callable[[torch.Tensor, Dict[str, Any]], tuple[torch.Tensor, Dict[str, Any]]]] = None,
         box_format: str = "xyxy",
         normalize_boxes: bool = True,
@@ -129,6 +168,7 @@ class LDRNetDataset(Dataset):
         self.target_key = target_key
         self.image_root = Path(image_root) if image_root is not None else None
         self.image_size = image_size
+        self.deduplicate_boxes = deduplicate_boxes
         self.transforms = transforms
         self.box_format = box_format
         self.normalize_boxes = normalize_boxes
@@ -216,6 +256,12 @@ class LDRNetDataset(Dataset):
         else:
             target["labels"] = _to_tensor(labels, dtype=torch.long).reshape(-1)
 
+        if self.deduplicate_boxes:
+            target["boxes"], target["labels"] = _deduplicate_boxes_and_labels(
+                target["boxes"],
+                target["labels"],
+            )
+
         disease_labels = target.get("disease_labels", None)
         if disease_labels is None:
             target["disease_labels"] = None
@@ -238,13 +284,20 @@ class LDRNetDataset(Dataset):
 class CXRDetectionDiseaseDataset(LDRNetDataset):
     """Chest X-ray dataset with joint lesion and disease labels."""
 
-    def __init__(self, annotations_path: str | Path, image_root: str | Path = ".", image_size: int = 1024):
+    def __init__(
+        self,
+        annotations_path: str | Path,
+        image_root: str | Path = ".",
+        image_size: int = 1024,
+        deduplicate_boxes: bool = True,
+    ):
         super().__init__(
             samples=annotations_path,
             image_key="image_path",
             target_key=None,
             image_root=image_root,
             image_size=image_size,
+            deduplicate_boxes=deduplicate_boxes,
             box_format="cxcywh",
             normalize_boxes=False,
         )

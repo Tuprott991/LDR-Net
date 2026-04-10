@@ -5,3 +5,4 @@ __pycache__/
 *.pyd
 .pytest_cache/
 outputs/
+tmp_infer_input.png

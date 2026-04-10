@@ -44,6 +44,7 @@ def summarize_jsonl_samples(samples: Iterable[Mapping]) -> dict:
     contiguous_labels = unique_labels == set(range(max_label + 1)) if unique_labels else False
     return {
         "num_samples": num_samples,
+        "positive_box_samples": num_samples - empty_box_samples,
         "empty_box_samples": empty_box_samples,
         "disease_supervised_samples": disease_supervised_samples,
         "num_unique_labels": len(unique_labels),
@@ -59,6 +60,7 @@ def summarize_jsonl_samples(samples: Iterable[Mapping]) -> dict:
 def format_summary(prefix: str, summary: dict) -> str:
     return (
         f"{prefix}: samples={summary['num_samples']} "
+        f"positive_boxes={summary['positive_box_samples']} "
         f"empty_boxes={summary['empty_box_samples']} "
         f"disease_supervised={summary['disease_supervised_samples']} "
         f"unique_labels={summary['num_unique_labels']} "
