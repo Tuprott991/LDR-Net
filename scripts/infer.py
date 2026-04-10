@@ -14,49 +14,6 @@ from torchvision.transforms.functional import pil_to_tensor
 
 from ldr_net.models import LesionDiseaseNet
 
-DEFAULT_VINDR_40_LABELS = [
-    "Boot-shaped heart",
-    "Peribronchovascular interstitial opacity",
-    "Reticulonodular opacity",
-    "Bronchial thickening",
-    "Enlarged PA",
-    "Cardiomegaly",
-    "Diffuse aveolar opacity",
-    "Other opacity",
-    "Other lesion",
-    "Consolidation",
-    "Mediastinal shift",
-    "Anterior mediastinal mass",
-    "Dextro cardia",
-    "Pleural effusion",
-    "Stomach on the right side",
-    "Atelectasis",
-    "Lung hyperinflation",
-    "Egg on string sign",
-    "Interstitial lung disease - ILD",
-    "Infiltration",
-    "Lung cavity",
-    "Pneumothorax",
-    "Edema",
-    "Pleural thickening",
-    "Other nodule/mass",
-    "Clavicle fracture",
-    "Chest wall mass",
-    "Lung cyst",
-    "Emphysema",
-    "Bronchectasis",
-    "Expanded edges of the anterior ribs",
-    "Pulmonary fibrosis",
-    "Paraveterbral mass",
-    "Aortic enlargement",
-    "Calcification",
-    "Intrathoracic digestive structure",
-    "ILD",
-    "Nodule/Mass",
-    "Lung Opacity",
-    "Rib fracture",
-]
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run LDR-Net inference on a single image")
@@ -114,12 +71,9 @@ def load_label_names(num_lesions: int, metadata_arg: str | None):
             continue
         box_classes = metadata.get("box_classes")
         if isinstance(box_classes, list) and len(box_classes) == num_lesions:
-            return box_classes
+            return box_classes, f"metadata:{path}"
 
-    if num_lesions == len(DEFAULT_VINDR_40_LABELS):
-        return DEFAULT_VINDR_40_LABELS
-
-    return [f"class_{index}" for index in range(num_lesions)]
+    return [f"class_{index}" for index in range(num_lesions)], "generic"
 
 
 def load_image_tensor(image_path: Path, image_size: int):
@@ -208,7 +162,7 @@ def main():
         image_path,
         image_size=model_cfg["image_size"],
     )
-    label_names = load_label_names(model_cfg["num_lesions"], args.metadata)
+    label_names, label_source = load_label_names(model_cfg["num_lesions"], args.metadata)
 
     with torch.no_grad():
         outputs = model(image_tensor.unsqueeze(0).to(device))
@@ -230,6 +184,10 @@ def main():
 
     print(f"checkpoint: {checkpoint_path}")
     print(f"image: {image_path}")
+    print(f"num_lesions: {model_cfg['num_lesions']}")
+    print(f"label_source: {label_source}")
+    if label_source == "generic":
+        print("warning: no matching metadata.json was found, so class names are generic and not clinically meaningful")
     print(f"detections: {len(scores)}")
     for box, label, score in zip(boxes.tolist(), labels.tolist(), scores.tolist()):
         print(f"{label_names[label]}\tscore={score:.4f}\tbox={[round(v, 2) for v in box]}")
